@@ -1,0 +1,46 @@
+# Maintainer: ANANDHUAJITH
+pkgname=ketchup-branding
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Ketchup wallpapers, icons, Plymouth boot theme, and Calamares branding"
+arch=('any')
+url="https://github.com/ANANDHUAJITH/ketchup"
+license=('CC-BY-SA-4.0')
+source=("ketchup::git+https://github.com/ANANDHUAJITH/ketchup.git#branch=main")
+sha256sums=('SKIP')
+
+package() {
+    cd "${srcdir}/ketchup/archiso/airootfs"
+
+    # wallpapers + backgrounds
+    install -d "${pkgdir}/usr/share/backgrounds"
+    [[ -d usr/share/backgrounds/ketchup ]] && cp -a usr/share/backgrounds/ketchup "${pkgdir}/usr/share/backgrounds/"
+    install -d "${pkgdir}/usr/share/wallpapers"
+    [[ -d usr/share/wallpapers/Ketchup ]] && cp -a usr/share/wallpapers/Ketchup "${pkgdir}/usr/share/wallpapers/"
+    [[ -d usr/share/wallpapers/Ketchup-Blue ]] && cp -a usr/share/wallpapers/Ketchup-Blue "${pkgdir}/usr/share/wallpapers/"
+
+    # icon themes
+    install -d "${pkgdir}/usr/share/icons"
+    for theme in ketchup ketchup-blue; do
+        [[ -d "usr/share/icons/${theme}" ]] && cp -a "usr/share/icons/${theme}" "${pkgdir}/usr/share/icons/"
+    done
+    install -Dm644 usr/share/icons/hicolor/scalable/apps/distributor-logo-ketchup.svg \
+        "${pkgdir}/usr/share/icons/hicolor/scalable/apps/distributor-logo-ketchup.svg"
+    install -Dm644 usr/share/icons/hicolor/scalable/apps/ketchup-logo.svg \
+        "${pkgdir}/usr/share/icons/hicolor/scalable/apps/ketchup-logo.svg"
+
+    # Plymouth boot theme
+    [[ -d usr/share/plymouth/themes/ketchup ]] && { \
+        install -d "${pkgdir}/usr/share/plymouth/themes"; \
+        cp -a usr/share/plymouth/themes/ketchup "${pkgdir}/usr/share/plymouth/themes/"; }
+
+    # Calamares installer branding
+    [[ -d usr/share/calamares/branding/ketchup ]] && { \
+        install -d "${pkgdir}/usr/share/calamares/branding"; \
+        cp -a usr/share/calamares/branding/ketchup "${pkgdir}/usr/share/calamares/branding/"; }
+
+    # the main Ketchup logo used by README/ketchup-tools' ASCII banner etc.
+    install -d "${pkgdir}/usr/share/ketchup"
+    [[ -f usr/share/ketchup/logo.svg ]] && \
+        install -Dm644 usr/share/ketchup/logo.svg "${pkgdir}/usr/share/ketchup/logo.svg"
+}

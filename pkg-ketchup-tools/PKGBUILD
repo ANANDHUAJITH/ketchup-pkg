@@ -1,0 +1,104 @@
+# Maintainer: ANANDHUAJITH
+pkgname=ketchup-tools
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Ketchup's ketchup-* command-line tools, systemd units, and related system config"
+arch=('any')
+url="https://github.com/ANANDHUAJITH/ketchup"
+license=('MIT')
+depends=('bash' 'systemd')
+source=("ketchup::git+https://github.com/ANANDHUAJITH/ketchup.git#branch=main")
+sha256sums=('SKIP')
+
+# Files that make up this package, relative to the airootfs tree in the
+# main `ketchup` repo. Keep this list in sync with archiso/airootfs when
+# a new ketchup-* tool or unit is added there.
+_bin_files=(
+    ketchup-apps-location ketchup-audit ketchup-blue-apps ketchup-blue-core
+    ketchup-blue-reset-check ketchup-blue-vault ketchup-boot-guard
+    ketchup-devtools ketchup-doctor ketchup-find ketchup-first-login
+    ketchup-firstboot ketchup-help-bugs ketchup-install ketchup-irqfix
+    ketchup-lab ketchup-lens ketchup-limine ketchup-man ketchup-mirrors
+    ketchup-noctalia-qt-check ketchup-notifyd ketchup-post-install
+    ketchup-pre-initramfs ketchup-rollback ketchup-upgrade ketchup-v3
+    ketchup-verify ketchup-version mythical-blue-ketchup the-legacy-red-ketchup
+)
+
+_systemd_units=(
+    ketchup-boot-guard-post.service ketchup-boot-guard-pre.service
+    ketchup-firstboot.service ketchup-network-guard.service
+    ketchup-notify.service ketchup-notify.timer
+    ketchup-upgrade-check.service ketchup-upgrade-check.timer
+)
+
+_desktop_files=(
+    ketchup-about.desktop ketchup-apps-location.desktop
+    ketchup-blue-mode.desktop ketchup-install.desktop
+)
+
+package() {
+    cd "${srcdir}/ketchup/archiso/airootfs"
+
+    # /usr/local/bin/ketchup-*
+    install -d "${pkgdir}/usr/local/bin"
+    for f in "${_bin_files[@]}"; do
+        install -Dm755 "usr/local/bin/${f}" "${pkgdir}/usr/local/bin/${f}"
+    done
+
+    # /usr/lib/ketchup (helper library files, if any)
+    [[ -d usr/lib/ketchup ]] && cp -a usr/lib/ketchup "${pkgdir}/usr/lib/"
+
+    # /etc/ketchup (config) and /etc/ketchup-release
+    [[ -d etc/ketchup ]] && cp -a etc/ketchup "${pkgdir}/etc/"
+    install -Dm644 etc/ketchup-release "${pkgdir}/etc/ketchup-release"
+
+    # systemd units (installed disabled; installer/first-boot enables the
+    # ones that need enabling instead of this package forcing it on every
+    # host, including ones not running Ketchup's live/install flow)
+    install -d "${pkgdir}/usr/lib/systemd/system"
+    for u in "${_systemd_units[@]}"; do
+        install -Dm644 "etc/systemd/system/${u}" "${pkgdir}/usr/lib/systemd/system/${u}"
+    done
+
+    # drop-ins that tune other units' behavior for Ketchup
+    for d in etc/systemd/oomd.conf.d/10-ketchup.conf \
+             etc/systemd/system.conf.d/10-ketchup.conf \
+             etc/systemd/system/scx.service.d/ketchup.conf \
+             etc/systemd/system/pacman-init.service.d/ketchup.conf \
+             etc/systemd/system/plymouth-quit.service.d/ketchup-retain-splash.conf \
+             etc/systemd/system/NetworkManager.service.d/ketchup.conf; do
+        install -Dm644 "$d" "${pkgdir}/${d}"
+    done
+
+    # udev, sysctl, modules-load, containers config
+    install -Dm644 etc/udev/rules.d/60-ketchup-ioschedulers.rules \
+        "${pkgdir}/etc/udev/rules.d/60-ketchup-ioschedulers.rules"
+    install -Dm644 etc/sysctl.d/98-ketchup-hardening.conf \
+        "${pkgdir}/etc/sysctl.d/98-ketchup-hardening.conf"
+    install -Dm644 etc/sysctl.d/99-ketchup.conf \
+        "${pkgdir}/etc/sysctl.d/99-ketchup.conf"
+    install -Dm644 etc/modules-load.d/ketchup.conf \
+        "${pkgdir}/etc/modules-load.d/ketchup.conf"
+    install -Dm644 etc/containers/registries.conf.d/10-ketchup.conf \
+        "${pkgdir}/etc/containers/registries.conf.d/10-ketchup.conf"
+
+    # pacman hooks (Limine boot-menu sync, Plymouth, Noctalia/Qt ABI check)
+    for h in 95-ketchup-limine.hook 96-ketchup-plymouth.hook 97-ketchup-noctalia-qt-abi.hook; do
+        install -Dm644 "usr/share/libalpm/hooks/${h}" "${pkgdir}/usr/share/libalpm/hooks/${h}"
+    done
+
+    # .desktop launchers
+    for d in "${_desktop_files[@]}"; do
+        install -Dm644 "usr/share/applications/${d}" "${pkgdir}/usr/share/applications/${d}"
+    done
+    install -Dm644 etc/skel/Desktop/ketchup-install.desktop \
+        "${pkgdir}/etc/skel/Desktop/ketchup-install.desktop"
+
+    # misc docs / ascii art shipped under /usr/share/ketchup (not the logo —
+    # that ships in ketchup-branding so a system can swap branding alone)
+    install -d "${pkgdir}/usr/share/ketchup"
+    [[ -d usr/share/doc/ketchup ]] && cp -a usr/share/doc/ketchup "${pkgdir}/usr/share/doc/"
+    [[ -f usr/share/ketchup/ascii/ketchup-logo.txt ]] && \
+        install -Dm644 usr/share/ketchup/ascii/ketchup-logo.txt \
+            "${pkgdir}/usr/share/ketchup/ascii/ketchup-logo.txt"
+}

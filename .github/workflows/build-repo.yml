@@ -1,0 +1,59 @@
+name: Build and publish ketchup-pkg
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+    steps:
+      - name: Checkout ketchup-pkg
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          pacman -Syu --noconfirm --needed git pacman-contrib
+
+      - name: Create unprivileged build user
+        run: |
+          useradd -m builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: makepkg ketchup-tools
+        run: su builder -c 'cd pkg-ketchup-tools && makepkg -s --noconfirm --skippgpcheck'
+
+      - name: makepkg ketchup-branding
+        run: su builder -c 'cd pkg-ketchup-branding && makepkg -s --noconfirm --skippgpcheck'
+
+      - name: Assemble repo database
+        # Packages live under x86_64/ so the Pages URL matches pacman.conf's
+        # Server = https://<user>.github.io/ketchup-pkg/$arch
+        run: |
+          mkdir -p repo-out/x86_64
+          cp pkg-ketchup-tools/*.pkg.tar.zst repo-out/x86_64/
+          cp pkg-ketchup-branding/*.pkg.tar.zst repo-out/x86_64/
+          cd repo-out/x86_64
+          repo-add ketchup-pkg.db.tar.gz *.pkg.tar.zst
+
+      - name: Upload repo artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: repo-out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
